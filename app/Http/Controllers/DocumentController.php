@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\SaveDocumentAction;
 use App\Models\Document;
 use Illuminate\Http\Request;
-use App\Actions\SaveDocumentAction;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
+    private $paginationAmount = 5;
     /**
      * Display a listing of the resource.
      *
@@ -15,7 +17,7 @@ class DocumentController extends Controller
      */
     public function index()
     {
-        $documents = Document::with('user')->paginate(1);
+        $documents = Document::with('user')->paginate($this->paginationAmount);
         return view('documents.index', compact('documents'));
     }
 
@@ -38,7 +40,7 @@ class DocumentController extends Controller
     public function store(Request $request, SaveDocumentAction $documentAction)
     {
         $validated = $request->validate([
-            'document' => 'required|mimes:txt'
+            'document' => 'required|mimes:txt',
         ]);
 
         $documentAction->execute($request->toArray());
@@ -103,6 +105,22 @@ class DocumentController extends Controller
      */
     public function destroy(Document $document)
     {
-        //
+        Storage::delete($document->location);
+        $document->delete();
+        return redirect(route('documents.index'));
+
+    }
+
+    public function search(Request $request)
+    {
+        $documents = Document::search($request->term)->paginate($this->paginationAmount);
+        $documents->appends(['term' => $request->term]);
+        return view('documents.index', compact('documents'));
+    }
+
+    public function download($id)
+    {
+        $document = Document::findOrFail($id);
+        return Storage::download($document->location, $document->filename);
     }
 }
